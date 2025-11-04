@@ -23,8 +23,8 @@ from pretix_passbook.forms import PNGImageField
 class PassbookOutput(BaseTicketOutput):
     identifier = "passbook"
     verbose_name = "Passbook Tickets"
-    download_button_icon = "fa-mobile"
-    download_button_text = _("Wallet/Passbook")
+    download_button_icon = "fa-apple"
+    download_button_text = _("Apple Wallet")
     multi_download_enabled = False
 
     @property
