@@ -437,7 +437,6 @@ class PassbookOutput(BaseTicketOutput):
         passfile.barcode = Barcode(
             message=order_position.secret, format=BarcodeFormat.QR
         )
-        passfile.barcode.altText = order_position.secret
 
         date_from_local_time = ev.date_from.astimezone(tz)
         date_to_local_time = ev.date_to.astimezone(tz) if ev.date_to else None
