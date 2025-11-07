@@ -24,7 +24,7 @@ class PassbookOutput(BaseTicketOutput):
     identifier = "passbook"
     verbose_name = "Passbook Tickets"
     download_button_icon = "fa-apple"
-    download_button_text = _("Apple Wallet")
+    download_button_text = _("Add to Apple Wallet")
     multi_download_enabled = False
 
     @property
