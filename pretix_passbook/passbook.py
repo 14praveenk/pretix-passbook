@@ -10,7 +10,7 @@ from django.core.files.storage import default_storage
 from django.core.validators import RegexValidator
 from django.utils.formats import date_format
 from django.utils.translation import gettext, gettext_lazy as _  # NOQA
-from pretix.base.models import OrderPosition
+from pretix.base.models import OrderPosition, ItemMetaValue
 from pretix.base.pdf import get_seat
 from pretix.base.ticketoutput import BaseTicketOutput
 from pretix.control.forms import ClearableBasenameFileInput
@@ -338,46 +338,62 @@ class PassbookOutput(BaseTicketOutput):
                 gettext("Admission time"),
             )
 
-        if order_position.valid_from:
+        program_times = order_position.item.program_times.all()
+        if program_times:
+            min_start = min(pt.start for pt in program_times)
+            max_end = max(pt.end for pt in program_times)
             card.addAuxiliaryField(
-                "doorsOpen",
-                date_format(
-                    order_position.valid_from.astimezone(tz), "SHORT_DATETIME_FORMAT"
-                ),
-                gettext("From"),
+                "doorsOpen", date_format(min_start.astimezone(tz), "SHORT_DATETIME_FORMAT"), gettext("From")
             )
+            if ev.seating_plan_id:
+                card.addBackField(
+                    "doorsClose", date_format(max_end.astimezone(tz), "SHORT_DATETIME_FORMAT"), gettext("To")
+                )
+            else:
+                card.addAuxiliaryField(
+                    "doorsClose", date_format(max_end.astimezone(tz), "SHORT_DATETIME_FORMAT"), gettext("To")
+                )
         else:
-            card.addAuxiliaryField(
-                "doorsOpen", ev.get_date_from_display(tz, short=True), gettext("From")
-            )
-        if order_position.valid_until:
-            if ev.seating_plan_id:
-                card.addBackField(
-                    "doorsClose",
+            if order_position.valid_from:
+                card.addAuxiliaryField(
+                    "doorsOpen",
                     date_format(
-                        order_position.valid_until.astimezone(tz),
-                        "SHORT_DATETIME_FORMAT",
+                        order_position.valid_from.astimezone(tz), "SHORT_DATETIME_FORMAT"
                     ),
-                    gettext("To"),
+                    gettext("From"),
                 )
             else:
                 card.addAuxiliaryField(
-                    "doorsClose",
-                    date_format(
-                        order_position.valid_until.astimezone(tz),
-                        "SHORT_DATETIME_FORMAT",
-                    ),
-                    gettext("To"),
+                    "doorsOpen", ev.get_date_from_display(tz, short=True), gettext("From")
                 )
-        elif order.event.settings.show_date_to and ev.date_to:
-            if ev.seating_plan_id:
-                card.addBackField(
-                    "doorsClose", ev.get_date_to_display(tz, short=True), gettext("To")
-                )
-            else:
-                card.addAuxiliaryField(
-                    "doorsClose", ev.get_date_to_display(tz, short=True), gettext("To")
-                )
+            if order_position.valid_until:
+                if ev.seating_plan_id:
+                    card.addBackField(
+                        "doorsClose",
+                        date_format(
+                            order_position.valid_until.astimezone(tz),
+                            "SHORT_DATETIME_FORMAT",
+                        ),
+                        gettext("To"),
+                    )
+                else:
+                    card.addAuxiliaryField(
+                        "doorsClose",
+                        date_format(
+                            order_position.valid_until.astimezone(tz),
+                            "SHORT_DATETIME_FORMAT",
+                        ),
+                        gettext("To"),
+                    )
+            elif order.event.settings.show_date_to and ev.date_to:
+                if ev.seating_plan_id:
+                    card.addBackField(
+                        "doorsClose", ev.get_date_to_display(tz, short=True), gettext("To")
+                    )
+                else:
+                    card.addAuxiliaryField(
+                        "doorsClose", ev.get_date_to_display(tz, short=True), gettext("To")
+                    )
 
         if order_position.attendee_name:
             card.addBackField(
@@ -416,6 +432,18 @@ class PassbookOutput(BaseTicketOutput):
                 build_absolute_uri(order.event, "presale:event.index"),
                 gettext("Website"),
             )
+
+        try:
+            backfieldprop = order_position.item.meta_data.get("pretix_passbook_backfield")
+
+            if backfieldprop:
+                card.addBackField(
+                    "metabackfield",
+                    backfieldprop,
+                    gettext("Additional information")
+                )
+        except ItemMetaValue.DoesNotExist:
+            pass
 
         passfile = Pass(
             card,
